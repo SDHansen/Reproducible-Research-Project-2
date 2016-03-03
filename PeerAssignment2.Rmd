@@ -1,0 +1,79 @@
+---
+title: 'Reproducible Research: Peer Assignment 2'
+author: "Scott Hansen"
+date: "Wednesday, March 02, 2016"
+output: html_document
+---
+
+## Initial Settings
+
+```{r setoptions, echo=FALSE}
+  knitr::opts_chunk$set(fig.width=12, fig.height=8, fig.path='Figs/',
+                      echo=TRUE, warning=FALSE, message=FALSE)
+
+  setwd("E:\\Data Scientist\\Data Science Track\\Reproducible Reseearch\\Project2\\Reproducible-Research-Project-2")
+```
+
+```{r LoadPackages, results="hide"}
+
+x<-c("R.utils", "ggplot2", "lubridate", "plyr")
+
+lapply(x, library, character.only=TRUE)
+
+```
+
+## Load Data
+If the data is not already downloaded in the working directory, we will attempt to retrieve and unzip the file from the internet
+
+```{rGetData, echo=TRUE}
+if (!"repdata-data-StormData.csv.bz2" %in% dir(".")) {
+    print("File Not Found... Attempting to download")
+    download.file("http://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2", destfile = "repdata-data-StormData.csv.bz2")
+    bunzip2("repdata-data-StormData.csv.bz2", overwrite=T, remove=F)
+}
+```
+
+### Load Variable
+Load and investigate the data set.  Cache is turned on to improve performance.
+
+```{r LoadData, cache=TRUE}
+  if(!"StormData" %in% ls())
+  {
+    StormData<-read.csv("repdata-data-StormDatarepdata-data-StormData.csv", stringsAsFactors = FALSE)
+  }
+  dim(StormData)
+  head(StormData, n=1)
+  str(StormData)
+```
+
+## Investigate Data set
+Histogram of storm events
+
+```{r histStormEvents, cache=TRUE}
+  StormData$Year<- as.numeric(year(mdy_hms(StormData$BGN_DATE)))
+  hist(StormData$Year, breaks=61)
+
+```
+## Chosing the best subset of the data
+It is unlikely that there were significantly more storms starting around 1990.  More likely record keeping improved; so the analysis will focus only on storms after 1990
+```{r reshapeData}
+  StormData<-StormData[StormData$Year >= 1990, ]
+  dim(StormData)
+```
+
+## Build Summary Statistics
+### Fatalities
+```{r Fatalities}
+  Fatalities<-aggregate(FATALITIES~EVTYPE, data=StormData, sum)
+  Fatalities<-head(arrange(Fatalities, Fatalities$FATALITIES, decreasing=TRUE), n=10)
+  Fatalities
+  
+```
+
+### Injuries
+```{r Injuries}
+  Injuries<-aggregate(INJURIES~EVTYPE, data=StormData, sum)
+  Injuries<-head(arrange(Injuries, Injuries$INJURIES, decreasing=TRUE), n=10)
+  Injuries
+  
+```
