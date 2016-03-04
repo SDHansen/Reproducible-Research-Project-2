@@ -1,10 +1,10 @@
 ---
 title: 'Reproducible Research: Peer Assignment 2'
 author: "Scott Hansen"
-date: "Wednesday, March 02, 2016"
+date: "Wednesday, March 04, 2016"
 output: html_document
 ---
-
+# Data Preparation
 ## Initial Settings
 
 ```{r setoptions, echo=FALSE}
@@ -16,7 +16,7 @@ output: html_document
 
 ```{r LoadPackages, results="hide"}
 
-x<-c("R.utils", "ggplot2", "lubridate", "plyr")
+x<-c("R.utils", "ggplot2", "lubridate", "plyr", "gridExtra")
 
 lapply(x, library, character.only=TRUE)
 
@@ -36,7 +36,7 @@ if (!"repdata-data-StormData.csv.bz2" %in% dir(".")) {
 ### Load Variable
 Load and investigate the data set.  Cache is turned on to improve performance.
 
-```{r LoadData, cache=TRUE}
+```{r LoadData}
   if(!"StormData" %in% ls())
   {
     StormData<-read.csv("repdata-data-StormDatarepdata-data-StormData.csv", stringsAsFactors = FALSE)
@@ -49,13 +49,13 @@ Load and investigate the data set.  Cache is turned on to improve performance.
 ## Investigate Data set
 Histogram of storm events
 
-```{r histStormEvents, cache=TRUE}
+```{r histStormEvents}
   StormData$Year<- as.numeric(year(mdy_hms(StormData$BGN_DATE)))
   hist(StormData$Year, breaks=61)
 
 ```
 ## Chosing the best subset of the data
-It is unlikely that there were significantly more storms starting around 1990.  More likely record keeping improved; so the analysis will focus only on storms after 1990
+It is unlikely that there were significantly more storms starting around 1990.  More likely record keeping improved; so the analysis will focus only on weather events after 1990
 ```{r reshapeData}
   StormData<-StormData[StormData$Year >= 1990, ]
   dim(StormData)
@@ -66,14 +66,126 @@ It is unlikely that there were significantly more storms starting around 1990.  
 ```{r Fatalities}
   Fatalities<-aggregate(FATALITIES~EVTYPE, data=StormData, sum)
   Fatalities<-head(arrange(Fatalities, Fatalities$FATALITIES, decreasing=TRUE), n=10)
-  Fatalities
-  
 ```
 
 ### Injuries
 ```{r Injuries}
   Injuries<-aggregate(INJURIES~EVTYPE, data=StormData, sum)
   Injuries<-head(arrange(Injuries, Injuries$INJURIES, decreasing=TRUE), n=10)
-  Injuries
   
 ```
+### Economic Impact
+The economic impact cannot be directly read from the data fram.  Based on the metadata about the data set, there is an exponential multiplier that must be applied.
+
+* Create a copy of the dataset
+* Apply the exponential multipier into a new field
+* Create the Total impact as a new field
+
+```{r EconomicImpact}
+  StormCost<-StormData
+  for (i in 1:nrow(StormCost))
+    {
+    StormCost$PROPDMG[i]=0
+    StormCost$CROPDMG[i]=0
+    if (StormCost$PROPDMGEXP[i]=="K") {StormCost$TPROPDMG[i]= StormCost$PROPDMG[i]*1000}
+    if (StormCost$PROPDMGEXP[i]=="M") {StormCost$TPROPDMG[i]= StormCost$PROPDMG[i]*1000000}
+    if (StormCost$PROPDMGEXP[i]=="B") {StormCost$TPROPDMG[i]= StormCost$PROPDMG[i]*1000000000}
+    
+    if (StormCost$CROPDMGEXP[i]=="K") {StormCost$TCROPDMG[i]= StormCost$CROPDMG[i]*1000}
+    if (StormCost$CROPDMGEXP[i]=="M") {StormCost$TCROPDMG[i]= StormCost$CROPDMG[i]*1000000}
+    if (StormCost$CROPDMGEXP[i]=="B") {StormCost$TCROPDMG[i]= StormCost$CROPDMG[i]*1000000000}
+    
+    StormCost$TotalDamage[i]<-StormCost$TCROPDMG[i]+ StormCost$TPROPDMG[i]
+    }
+```
+### Develop a Top 10 list for crop damage, property damage and total damage
+* Create a summary based on event type
+* Order the summarized data set and select the top 10 storm event types
+* Print results
+
+```{r EconSummary}
+  CropDamage<-aggregate(TCROPDMG~EVTYPE, data=StormCost, sum)
+  CropDamage<-head(arrange(CropDamage, CropDamage$TCROPDMG, decreasing=TRUE), n=10)
+
+  PropDamage<-aggregate(TPROPDMG~EVTYPE, data=StormCost, sum)
+  PropDamage<-head(arrange(PropDamage, PropDamage$TPROPDMG, decreasing=TRUE), n=10)
+
+  TotDamage<-aggregate(TotalDamage~EVTYPE, data=StormCost, sum)
+  TotDamage<-head(arrange(TotDamage, TotDamage$TotalDamage, decreasing=TRUE), n=10)
+
+```
+# Presentation of Results
+This analysis will break the analysis of weatherevents into 2 part:
+
+* Human cost
+* Economic costs
+
+## Presenting the human cost of weather
+The top 10 weather events for fatalities are:
+```{r presentFatalities}
+  Fatalities
+```
+The top 10 weather events for Injuries are:
+```{r presentInjuries}
+  Injuries
+```
+This can be best presented in a bar graph
+
+```{r graphHumanCost}
+fatalitiesPlot <- ggplot(Fatalities, aes(reorder(EVTYPE, FATALITIES), FATALITIES)) +
+  geom_bar(stat="identity") + 
+    scale_y_continuous("# of Fatalities") + 
+    theme(axis.text.x = element_text(angle = 45, 
+    hjust = 1)) + xlab("Weather Type") + 
+    ggtitle("Total Fatalities by Weather Type\n Events in the U.S.\n from 1990 - 2011")
+injuriesPlot <- ggplot(Injuries, aes(reorder(EVTYPE, INJURIES), INJURIES)) +
+  geom_bar(stat="identity") + 
+    scale_y_continuous("# of Injuries") + 
+    theme(axis.text.x = element_text(angle = 45, 
+    hjust = 1)) + xlab("Weather Type") + 
+    ggtitle("Total Injuries by Weather Type\n Events in the U.S.\n from 1990 - 2011")
+grid.arrange(fatalitiesPlot, injuriesPlot, ncol = 2)
+```
+Based on the above histograms, we find that excessive heat and tornado cause most fatalities; tornato causes most injuries in the United States from 1990 to 2011.
+
+
+## Presenting the economic cost of weather
+The top 10 weather events for Property damage are:
+```{r presentProperty}
+  PropDamage
+```
+The top 10 weather events for Crop damage are:
+```{r presentCrops}
+  CropDamage
+```
+The top 10 weather events for Total damage are:
+```{r presentTotal}
+  TotDamage
+```
+
+This can be best presented in a bar graph
+
+```{r graphEconomicCosts}
+propertyPlot <- ggplot(PropDamage, aes(reorder(EVTYPE, TPROPDMG), TPROPDMG)) +
+  geom_bar(stat="identity") + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + scale_y_continuous("Property Damage in US dollars")+ 
+  xlab("Weather Type") + ggtitle("Total Property Damage by\n Weather Type in\n the U.S. from 1990 - 2011")
+
+
+cropPlot<- ggplot(CropDamage, aes(reorder(EVTYPE, TCROPDMG), TCROPDMG)) +
+  geom_bar(stat="identity") + 
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)) + scale_y_continuous("Crop Damage in US dollars") + 
+    xlab("Weather Type") + ggtitle("Total Crop Damage by \nWeather Type in\n the U.S. from 1990 - 2011")
+
+totalPlot<- ggplot(TotDamage, aes(reorder(EVTYPE, TotalDamage), TotalDamage)) +
+  geom_bar(stat="identity") + 
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)) + scale_y_continuous("Total Damage in US dollars") + 
+    xlab("Severe Weather") + ggtitle("Total Damage by \nWeather Type in\n the U.S. from 1990 - 2011")
+
+grid.arrange(propertyPlot, cropPlot, totalPlot, ncol = 2, nrow=2)
+```
+
+Based on the above histograms, we find that flood and hurricane/typhoon cause most property damage; drought and flood causes most crop damage in the United States from 1990 to 2011.
+
+# Conclusion
+From these data, we found that excessive heat and tornado are most harmful with respect to population health, while flood, drought, and hurricane/typhoon have the greatest economic consequences.
