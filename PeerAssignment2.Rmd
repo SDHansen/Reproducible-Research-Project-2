@@ -77,26 +77,33 @@ It is unlikely that there were significantly more storms starting around 1990.  
 ### Economic Impact
 The economic impact cannot be directly read from the data fram.  Based on the metadata about the data set, there is an exponential multiplier that must be applied.
 
-* Create a copy of the dataset
-* Apply the exponential multipier into a new field
-* Create the Total impact as a new field
+* Summarize Property and Crop damage
+* Eliminate Bad Exponential exponential multipliers
 
 ```{r EconomicImpact}
-  StormCost<-StormData
-  for (i in 1:nrow(StormCost))
+
+  PropDamage<- aggregate(PROPDMG~EVTYPE+PROPDMGEXP, data=StormData, sum)
+  PropDamage<- PropDamage[PropDamage$PROPDMGEXP %in% c("K", "M", "B"),]
+
+  CropDamage<- aggregate(CROPDMG~EVTYPE+CROPDMGEXP, data=StormData, sum)
+  CropDamage<- CropDamage[CropDamage$CROPDMGEXP %in% c("K", "M", "B"),]
+
+  for (i in 1:nrow(CropDamage))
     {
-    StormCost$PROPDMG[i]=0
-    StormCost$CROPDMG[i]=0
-    if (StormCost$PROPDMGEXP[i]=="K") {StormCost$TPROPDMG[i]= StormCost$PROPDMG[i]*1000}
-    if (StormCost$PROPDMGEXP[i]=="M") {StormCost$TPROPDMG[i]= StormCost$PROPDMG[i]*1000000}
-    if (StormCost$PROPDMGEXP[i]=="B") {StormCost$TPROPDMG[i]= StormCost$PROPDMG[i]*1000000000}
-    
-    if (StormCost$CROPDMGEXP[i]=="K") {StormCost$TCROPDMG[i]= StormCost$CROPDMG[i]*1000}
-    if (StormCost$CROPDMGEXP[i]=="M") {StormCost$TCROPDMG[i]= StormCost$CROPDMG[i]*1000000}
-    if (StormCost$CROPDMGEXP[i]=="B") {StormCost$TCROPDMG[i]= StormCost$CROPDMG[i]*1000000000}
-    
-    StormCost$TotalDamage[i]<-StormCost$TCROPDMG[i]+ StormCost$TPROPDMG[i]
+
+    if (CropDamage$CROPDMGEXP[i]=="K") {CropDamage$CROPDMG[i]= CropDamage$CROPDMG[i]*1000}
+    if (CropDamage$CROPDMGEXP[i]=="M") {CropDamage$CROPDMG[i]= CropDamage$CROPDMG[i]*1000000}
+    if (CropDamage$CROPDMGEXP[i]=="B") {CropDamage$CROPDMG[i]= CropDamage$CROPDMG[i]*1000000000}
     }
+    
+  for (i in 1:nrow(PropDamage))
+    {
+
+    if (PropDamage$PROPDMGEXP[i]=="K") {PropDamage$PROPDMG[i]= PropDamage$PROPDMG[i]*1000}
+    if (PropDamage$PROPDMGEXP[i]=="M") {PropDamage$PROPDMG[i]= PropDamage$PROPDMG[i]*1000000}
+    if (PropDamage$PROPDMGEXP[i]=="B") {PropDamage$PROPDMG[i]= PropDamage$PROPDMG[i]*1000000000}
+    }
+
 ```
 ### Develop a Top 10 list for crop damage, property damage and total damage
 * Create a summary based on event type
@@ -104,14 +111,11 @@ The economic impact cannot be directly read from the data fram.  Based on the me
 * Print results
 
 ```{r EconSummary}
-  CropDamage<-aggregate(TCROPDMG~EVTYPE, data=StormCost, sum)
-  CropDamage<-head(arrange(CropDamage, CropDamage$TCROPDMG, decreasing=TRUE), n=10)
+  CropDamage<-aggregate(CROPDMG~EVTYPE, data=CropDamage, sum)
+  CropDamage<-head(arrange(CropDamage, CropDamage$CROPDMG, decreasing=TRUE), n=10)
 
-  PropDamage<-aggregate(TPROPDMG~EVTYPE, data=StormCost, sum)
-  PropDamage<-head(arrange(PropDamage, PropDamage$TPROPDMG, decreasing=TRUE), n=10)
-
-  TotDamage<-aggregate(TotalDamage~EVTYPE, data=StormCost, sum)
-  TotDamage<-head(arrange(TotDamage, TotDamage$TotalDamage, decreasing=TRUE), n=10)
+  PropDamage<-aggregate(PROPDMG~EVTYPE, data=PropDamage, sum)
+  PropDamage<-head(arrange(PropDamage, PropDamage$PROPDMG, decreasing=TRUE), n=10)
 
 ```
 # Presentation of Results
@@ -158,31 +162,22 @@ The top 10 weather events for Crop damage are:
 ```{r presentCrops}
   CropDamage
 ```
-The top 10 weather events for Total damage are:
-```{r presentTotal}
-  TotDamage
-```
 
 This can be best presented in a bar graph
 
 ```{r graphEconomicCosts}
-propertyPlot <- ggplot(PropDamage, aes(reorder(EVTYPE, TPROPDMG), TPROPDMG)) +
+propertyPlot <- ggplot(PropDamage, aes(reorder(EVTYPE, PROPDMG), PROPDMG)) +
   geom_bar(stat="identity") + 
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) + scale_y_continuous("Property Damage in US dollars")+ 
   xlab("Weather Type") + ggtitle("Total Property Damage by\n Weather Type in\n the U.S. from 1990 - 2011")
 
 
-cropPlot<- ggplot(CropDamage, aes(reorder(EVTYPE, TCROPDMG), TCROPDMG)) +
+cropPlot<- ggplot(CropDamage, aes(reorder(EVTYPE, CROPDMG), CROPDMG)) +
   geom_bar(stat="identity") + 
     theme(axis.text.x = element_text(angle = 45, hjust = 1)) + scale_y_continuous("Crop Damage in US dollars") + 
     xlab("Weather Type") + ggtitle("Total Crop Damage by \nWeather Type in\n the U.S. from 1990 - 2011")
 
-totalPlot<- ggplot(TotDamage, aes(reorder(EVTYPE, TotalDamage), TotalDamage)) +
-  geom_bar(stat="identity") + 
-    theme(axis.text.x = element_text(angle = 45, hjust = 1)) + scale_y_continuous("Total Damage in US dollars") + 
-    xlab("Severe Weather") + ggtitle("Total Damage by \nWeather Type in\n the U.S. from 1990 - 2011")
-
-grid.arrange(propertyPlot, cropPlot, totalPlot, ncol = 2, nrow=2)
+grid.arrange(propertyPlot, cropPlot, ncol = 2)
 ```
 
 Based on the above histograms, we find that flood and hurricane/typhoon cause most property damage; drought and flood causes most crop damage in the United States from 1990 to 2011.
